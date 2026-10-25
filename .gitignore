@@ -1,0 +1,11 @@
+# Pliki generowane podczas budowania .NET.
+**/bin/
+**/obj/
+
+# Lokalne ustawienia edytorów.
+.vs/
+.idea/
+*.user
+*.suo
+docs/
+example_app/

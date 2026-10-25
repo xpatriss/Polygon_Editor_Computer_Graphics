@@ -1,0 +1,41 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:PolygonEditor.App.Controls"
+        x:Class="PolygonEditor.App.Views.MainWindow"
+        Title="Edytor wielokątów"
+        Width="1000"
+        Height="650"
+        MinWidth="760"
+        MinHeight="480"
+        WindowStartupLocation="CenterScreen">
+    <Grid Margin="16"
+          RowDefinitions="Auto,*"
+          ColumnDefinitions="*,220"
+          RowSpacing="12"
+          ColumnSpacing="12">
+        <TextBlock Grid.ColumnSpan="2"
+                   Text="Edytor wielokątów"
+                   FontSize="20"
+                   FontWeight="SemiBold" />
+
+        <!-- główny obszar okna -->
+        <Border Grid.Row="1"
+                Background="White"
+                BorderBrush="#D1D5DB"
+                BorderThickness="1">
+            <controls:SceneCanvas x:Name="EditorCanvas"
+                                  ClipToBounds="True" />
+        </Border>
+
+        <Border Grid.Row="1"
+                Grid.Column="1"
+                Background="#F3F4F6"
+                Padding="16">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Właściwości" FontWeight="SemiBold" />
+                <TextBlock Text="Brak zaznaczonego elementu."
+                           TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>
