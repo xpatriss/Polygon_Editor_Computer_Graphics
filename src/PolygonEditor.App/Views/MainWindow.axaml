@@ -32,8 +32,20 @@
                 Background="#F3F4F6"
                 Padding="16">
             <StackPanel Spacing="8">
+                <TextBlock Text="Rysowanie odcinków" FontWeight="SemiBold" />
+                <RadioButton x:Name="LibraryLineRadio" Content="Biblioteczne"
+                             GroupName="LineAlgorithm" IsChecked="True" />
+                <RadioButton x:Name="BresenhamLineRadio" Content="Bresenham"
+                             GroupName="LineAlgorithm" />
+                <Separator />
                 <TextBlock Text="Właściwości" FontWeight="SemiBold" />
-                <TextBlock Text="Brak zaznaczonego elementu."
+                <TextBlock x:Name="SelectionStatus" Text="Brak zaznaczonego elementu."
+                           TextWrapping="Wrap" />
+                <Button x:Name="InsertVertexButton" Content="Dodaj wierzchołek" />
+                <Button x:Name="DeleteVertexButton" Content="Usuń wierzchołek" />
+                <TextBlock Text="Lewy przycisk: zaznacz i przeciągnij. Wnętrze lub krawędź: ruch wielokąta."
+                           TextWrapping="Wrap" />
+                <TextBlock Text="Insert — środek krawędzi&#10;Delete — usuń wierzchołek&#10;Escape — wyczyść zaznaczenie"
                            TextWrapping="Wrap" />
             </StackPanel>
         </Border>
