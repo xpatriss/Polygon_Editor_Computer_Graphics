@@ -1,0 +1,24 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:PolygonEditor.App.Controls"
+             x:Class="PolygonEditor.App.Controls.ConstraintPanel">
+    <StackPanel Spacing="8">
+        <Separator />
+        <TextBlock Text="Ograniczenia" FontWeight="SemiBold" />
+        <TextBlock x:Name="EdgeInfo" TextWrapping="Wrap" />
+        <Button x:Name="LengthButton" Content="Ustaw długość…" />
+        <Button x:Name="ParallelButton" Content="Dodaj równoległość" />
+        <ListBox x:Name="ConstraintsList" MaxHeight="130">
+            <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="controls:ConstraintListItem">
+                    <TextBlock Text="{Binding Text}" TextWrapping="Wrap" />
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+        <Button x:Name="RemoveConstraintButton" Content="Usuń relację z listy" />
+        <TextBlock Text="Pierwsza krawędź: klik. Druga: Ctrl + klik. Wybieraj środki krawędzi."
+                   TextWrapping="Wrap" />
+        <TextBlock Text="L — długość; ∥ — równoległość. Ten sam numer oznacza tę samą relację. W/K — wielokąt/krawędź."
+                   TextWrapping="Wrap" />
+    </StackPanel>
+</UserControl>

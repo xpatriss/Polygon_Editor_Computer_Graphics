@@ -34,6 +34,10 @@ public partial class MainWindow : Window
         deleteButton.Click += (_, _) => canvas.DeleteVertex();
         status.Text = canvas.SelectionDescription;
 
+        var constraintsPanel = this.FindControl<ConstraintPanel>("ConstraintsPanel")
+            ?? throw new InvalidOperationException("ConstraintsPanel was not found.");
+        constraintsPanel.Connect(canvas, scene, this);
+
         var libraryRadio = this.FindControl<RadioButton>("LibraryLineRadio")
             ?? throw new InvalidOperationException("LibraryLineRadio was not found.");
         var bresenhamRadio = this.FindControl<RadioButton>("BresenhamLineRadio")

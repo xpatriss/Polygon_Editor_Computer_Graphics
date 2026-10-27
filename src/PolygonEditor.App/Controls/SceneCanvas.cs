@@ -6,6 +6,7 @@ using PolygonEditor.App.Interaction;
 using PolygonEditor.Core.Geometry;
 using PolygonEditor.App.Rendering;
 using PolygonEditor.Core.Model;
+using PolygonEditor.Core.Constraints;
 
 namespace PolygonEditor.App.Controls;
 
@@ -19,6 +20,8 @@ public sealed class SceneCanvas : Control
     private LineDrawingAlgorithm lineAlgorithm = LineDrawingAlgorithm.Library;
     public event EventHandler? SelectionChanged;
     public string SelectionDescription => interaction.Message;
+    public Edge? SelectedEdge => interaction.Selection?.Edge;
+    public Edge? SecondSelectedEdge => interaction.SecondaryEdge;
 
     public SceneCanvas()
     {
@@ -38,7 +41,7 @@ public sealed class SceneCanvas : Control
     {
         ArgumentNullException.ThrowIfNull(scene);
         StopDragging();
-        interaction.Clear();
+        interaction.SetScene(scene);
         this.scene = scene;
         Refresh();
     }
@@ -51,7 +54,7 @@ public sealed class SceneCanvas : Control
         context.DrawRectangle(Brushes.Transparent, null, new Rect(Bounds.Size));
         if (scene == null)
             return;
-        renderer.Draw(context, scene, interaction.Selection, lineAlgorithm);
+        renderer.Draw(context, scene, interaction.Selection, lineAlgorithm, interaction.SecondaryEdge);
     }
 
     // Lewy przycisk wybiera element. Przechwycenie myszy pozwala przeciągać poza płótnem.
@@ -61,6 +64,13 @@ public sealed class SceneCanvas : Control
         if (scene is null || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
             return;
         Focus();
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        {
+            interaction.SelectSecondEdge(scene, ToPoint(e.GetPosition(this)));
+            Refresh();
+            e.Handled = true;
+            return;
+        }
         interaction.BeginDrag(scene, ToPoint(e.GetPosition(this)));
         if (interaction.IsDragging)
         {
@@ -81,7 +91,7 @@ public sealed class SceneCanvas : Control
             StopDragging();
         else
             interaction.Move(ToPoint(e.GetPosition(this)));
-        InvalidateVisual();
+        Refresh();
     }
 
     // Uwzględnia ostatnią pozycję kursora, kończy gest i zwalnia przechwycenie myszy.
@@ -137,6 +147,33 @@ public sealed class SceneCanvas : Control
     {
         StopDragging();
         interaction.DeleteVertex();
+        Focus();
+        Refresh();
+    }
+
+    // Kończy gest, zleca zmianę długości i odświeża scenę oraz panel.
+    public void SetLength(double length)
+    {
+        StopDragging();
+        interaction.SetLength(length);
+        Focus();
+        Refresh();
+    }
+
+    // Dodaje relację dla wybranej pary krawędzi i pokazuje wynik próby.
+    public void AddParallel()
+    {
+        StopDragging();
+        interaction.AddParallel();
+        Focus();
+        Refresh();
+    }
+
+    // Wspólna obsługa usuwania relacji z panelu i odświeżenia jej oznaczeń.
+    public void RemoveConstraint(GeometricConstraint constraint)
+    {
+        StopDragging();
+        interaction.RemoveConstraint(constraint);
         Focus();
         Refresh();
     }

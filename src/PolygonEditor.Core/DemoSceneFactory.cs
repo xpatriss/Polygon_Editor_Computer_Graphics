@@ -1,5 +1,6 @@
 using PolygonEditor.Core.Geometry;
 using PolygonEditor.Core.Model;
+using PolygonEditor.Core.Editing;
 
 namespace PolygonEditor.Core
 {
@@ -25,6 +26,10 @@ namespace PolygonEditor.Core
                 new Point2D(580, 100)));
 
             Scene scene = new Scene(polygons);
+            // Długość górnej krawędzi prostokąta i równoległość z poziomą krawędzią drugiego wielokąta.
+            if (!ConstraintEditor.TrySetLength(scene, polygons[0].Edges[0], 180, out var message)
+                || !ConstraintEditor.TryAddParallel(scene, polygons[0].Edges[0], polygons[1].Edges[1], out message))
+                throw new InvalidOperationException(message);
             return scene;
         }
 

@@ -10,7 +10,7 @@
         WindowStartupLocation="CenterScreen">
     <Grid Margin="16"
           RowDefinitions="Auto,*"
-          ColumnDefinitions="*,220"
+          ColumnDefinitions="*,270"
           RowSpacing="12"
           ColumnSpacing="12">
         <TextBlock Grid.ColumnSpan="2"
@@ -31,6 +31,7 @@
                 Grid.Column="1"
                 Background="#F3F4F6"
                 Padding="16">
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
             <StackPanel Spacing="8">
                 <TextBlock Text="Rysowanie odcinków" FontWeight="SemiBold" />
                 <RadioButton x:Name="LibraryLineRadio" Content="Biblioteczne"
@@ -43,11 +44,13 @@
                            TextWrapping="Wrap" />
                 <Button x:Name="InsertVertexButton" Content="Dodaj wierzchołek" />
                 <Button x:Name="DeleteVertexButton" Content="Usuń wierzchołek" />
+                <controls:ConstraintPanel x:Name="ConstraintsPanel" />
                 <TextBlock Text="Lewy przycisk: zaznacz i przeciągnij. Wnętrze lub krawędź: ruch wielokąta."
                            TextWrapping="Wrap" />
                 <TextBlock Text="Insert — środek krawędzi&#10;Delete — usuń wierzchołek&#10;Escape — wyczyść zaznaczenie"
                            TextWrapping="Wrap" />
             </StackPanel>
+            </ScrollViewer>
         </Border>
     </Grid>
 </Window>

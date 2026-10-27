@@ -190,7 +190,7 @@ for (int index = 0; index < 4; index++)
         var old = polygon.Edges.ToArray();
         var edge = old[selectedIndex];
         var view = polygon.Vertices;
-        var vertex = PolygonEditor.Core.Editing.PolygonEditor.InsertMidpoint(polygon, edge);
+        var vertex = PolygonEditor.Core.Editing.PolygonEditor.InsertMidpoint(new Scene(new[] { polygon }), polygon, edge);
         Require(vertex.Position.X == (edge.Start.Position.X + edge.End.Position.X) / 2 && vertex.Position.Y == (edge.Start.Position.Y + edge.End.Position.Y) / 2, "Wrong midpoint.");
         Require(view.Count == 5 && !polygon.Edges.Contains(edge), "View not updated or old edge retained.");
         foreach (var untouched in old.Where(e => !ReferenceEquals(e, edge)))
@@ -202,19 +202,21 @@ for (int index = 0; index < 4; index++)
         var polygon = Square();
         var vertex = polygon.Vertices[selectedIndex];
         var untouched = polygon.Edges.Where(e => !ReferenceEquals(e.Start, vertex) && !ReferenceEquals(e.End, vertex)).ToArray();
-        Require(PolygonEditor.Core.Editing.PolygonEditor.RemoveVertex(polygon, vertex), "Removal failed.");
+        var scene = new Scene(new[] { polygon });
+        Require(PolygonEditor.Core.Editing.PolygonEditor.RemoveVertex(scene, polygon, vertex), "Removal failed.");
         Require(polygon.Vertices.Count == 3 && !polygon.Vertices.Contains(vertex), "Vertex retained.");
         foreach (var edge in untouched) Require(polygon.Edges.Contains(edge), "Unrelated edge replaced.");
         Closed(polygon);
-        Require(!PolygonEditor.Core.Editing.PolygonEditor.RemoveVertex(polygon, polygon.Vertices[0]), "Triangle shrank.");
+        Require(!PolygonEditor.Core.Editing.PolygonEditor.RemoveVertex(scene, polygon, polygon.Vertices[0]), "Triangle shrank.");
         Closed(polygon);
     });
 }
 Check("Topology rejects foreign objects without changing polygon", () =>
 {
     var polygon = Square();
-    Reject<ArgumentException>(() => PolygonEditor.Core.Editing.PolygonEditor.InsertMidpoint(polygon, Square().Edges[0]), "edge");
-    Reject<ArgumentException>(() => PolygonEditor.Core.Editing.PolygonEditor.RemoveVertex(polygon, V(0, 0)), "vertex");
+    var scene = new Scene(new[] { polygon });
+    Reject<ArgumentException>(() => PolygonEditor.Core.Editing.PolygonEditor.InsertMidpoint(scene, polygon, Square().Edges[0]), "edge");
+    Reject<ArgumentException>(() => PolygonEditor.Core.Editing.PolygonEditor.RemoveVertex(scene, polygon, V(0, 0)), "vertex");
     Require(polygon.Vertices.Count == 4, "Invalid operation changed model.");
     Closed(polygon);
 });
@@ -305,5 +307,6 @@ Check("Self-intersection interior and topmost polygon are selectable", () =>
     Require(PolygonEditor.Core.Geometry.HitTesting.Pick(scene, new(50, 50))?.Polygon == top, "Wrong polygon layer.");
 });
 BresenhamChecks.Run(Check);
+ConstraintChecks.Run(Check);
 Console.WriteLine($"RESULT: {checks - failures}/{checks} checks passed.");
 return failures == 0 ? 0 : 1;

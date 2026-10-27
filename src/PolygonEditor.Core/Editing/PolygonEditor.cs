@@ -1,35 +1,37 @@
-using PolygonEditor.Core.Geometry;
 using PolygonEditor.Core.Model;
 
 namespace PolygonEditor.Core.Editing;
 
-// Publiczne operacje edycji, zmiany modelu pozostają w Core, bez zależności od myszy i Avalonii
+// Operacje zmieniające obwód; porządkują też relacje usuniętych krawędzi.
 public static class PolygonEditor
 {
-    // Ustawia nową pozycję istniejącego wierzchołka; jego Id pozostaje bez zmian.
-    public static void MoveVertex(Vertex vertex, Point2D position)
-    {
-        ArgumentNullException.ThrowIfNull(vertex);
-        if (!double.IsFinite(position.X) || !double.IsFinite(position.Y))
-            throw new ArgumentException("Position must be finite.", nameof(position));
-        vertex.Position = position;
-    }
-
-    // Sprawdza argumenty i zleca wielokątowi podział krawędzi.
+    // Dzieli krawędź i usuwa relacje zastąpionego odcinka.
     // Zwraca: nowy wierzchołek.
-    public static Vertex InsertMidpoint(Polygon polygon, Edge edge)
+    public static Vertex InsertMidpoint(Scene scene, Polygon polygon, Edge edge)
     {
+        ArgumentNullException.ThrowIfNull(scene);
         ArgumentNullException.ThrowIfNull(polygon);
         ArgumentNullException.ThrowIfNull(edge);
-        return polygon.SplitEdge(edge);
+        if (!scene.Polygons.Contains(polygon))
+            throw new ArgumentException("Polygon must belong to the scene.", nameof(polygon));
+        var vertex = polygon.SplitEdge(edge);
+        scene.RemoveConstraintsForEdges(new[] { edge.Id });
+        return vertex;
     }
 
-    // Sprawdza argumenty i zleca wielokątowi usunięcie wierzchołka.
+    // Usuwa wierzchołek i relacje obu zastąpionych krawędzi.
     // Zwraca: true po usunięciu, false dla trójkąta.
-    public static bool RemoveVertex(Polygon polygon, Vertex vertex)
+    public static bool RemoveVertex(Scene scene, Polygon polygon, Vertex vertex)
     {
+        ArgumentNullException.ThrowIfNull(scene);
         ArgumentNullException.ThrowIfNull(polygon);
         ArgumentNullException.ThrowIfNull(vertex);
-        return polygon.RemoveVertex(vertex);
+        if (!scene.Polygons.Contains(polygon))
+            throw new ArgumentException("Polygon must belong to the scene.", nameof(polygon));
+        var removedEdges = polygon.Edges.Where(edge => edge.Start == vertex || edge.End == vertex).Select(edge => edge.Id).ToArray();
+        if (!polygon.RemoveVertex(vertex))
+            return false;
+        scene.RemoveConstraintsForEdges(removedEdges);
+        return true;
     }
 }
