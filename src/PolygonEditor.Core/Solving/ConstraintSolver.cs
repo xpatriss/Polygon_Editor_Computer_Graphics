@@ -5,7 +5,7 @@ using PolygonEditor.Core.Model;
 namespace PolygonEditor.Core.Solving;
 
 // solver: kolejno zmniejsza błędy relacji, aż wszystkie mieszczą się w tolerancjach lub osiągnie limit iteracji
-public static class ConstraintSolver
+public static partial class ConstraintSolver
 {
     // dopuszczalna różnica między aktualną a wymaganą długością, w jednostkach sceny
     public const double LengthTolerance = 0.0001;
@@ -18,7 +18,7 @@ public static class ConstraintSolver
 
     // Punkty przypięte, np. pod kursorem, pozostają nieruchome. Nieudana próba cofa wszystkie korekty.
     // Można podać próbny zestaw relacji, zanim zostanie zapisany w scenie.
-    public static bool TrySolve(Scene scene, IReadOnlySet<Vertex>? pinnedVertices = null,
+    public static bool TrySolve(Scene scene, IReadOnlySet<ScenePoint>? pinnedVertices = null,
         IReadOnlyList<GeometricConstraint>? constraints = null)
     { 
         // jeśli nie przekazano próbnego zestawu, korzystamy z relacji zapisanych w scenie
@@ -27,6 +27,7 @@ public static class ConstraintSolver
         var edges = scene.Polygons.SelectMany(polygon => polygon.Edges).ToDictionary(edge => edge.Id);
         // kopia pozycji z wejścia do solvera, już po ustawieniu żądanego ruchu przez SceneEditor
         var before = SceneGeometry.CapturePositions(scene);
+        if (!ValidateArcRules(scene, out _)) return false;
         // w jednej iteracji próbujemy poprawić kolejno każdą relację
         for (int iteration = 0; iteration < MaximumIterations; iteration++)
         {
@@ -43,12 +44,38 @@ public static class ConstraintSolver
                     return false;
                 }
             }
-            // before.Keys to obiekty wierzchołków: sprawdzamy ich aktualne pozycje, nie zapisaną kopię
+            if (!UpdateSemicircleCenters(scene, pinnedVertices))
+            {
+                SceneGeometry.RestorePositions(before);
+                return false;
+            }
+            foreach (var equation in ArcEquations(scene))
+            {
+                if (equation is null || !Correct(equation, false, pinnedVertices))
+                {
+                    SceneGeometry.RestorePositions(before);
+                    return false;
+                }
+            }
+            // Ciągłość jest częścią tego samego uzgadniania co długość i równoległość.
+            foreach (var joint in ContinuityJoints(scene))
+            {
+                foreach (var equation in EvaluateContinuity(joint.Vertex, joint.Incoming, joint.Outgoing))
+                {
+                    if (equation is null || !Correct(equation, joint.Vertex.Continuity == ContinuityClass.G1, pinnedVertices))
+                    {
+                        SceneGeometry.RestorePositions(before);
+                        return false;
+                    }
+                }
+            }
+            // before.Keys to wierzchołki i uchwyty: sprawdzamy ich aktualne pozycje, nie zapisaną kopię
             // NaN lub nieskończoność oznacza niepoprawny wynik obliczeń - kończymy próby
             if (before.Keys.Any(vertex => !double.IsFinite(vertex.Position.X) || !double.IsFinite(vertex.Position.Y)))
                 break;
             // sprawdzamy wszystkie relacje ponownie: ostatnia korekta mogła naruszyć wcześniejsze.
-            if (constraints.All(constraint => IsSatisfied(Evaluate(constraint, edges))))
+            if (constraints.All(constraint => IsSatisfied(Evaluate(constraint, edges))) && ContinuitiesSatisfied(scene)
+                && ArcShapesSatisfied(scene))
                 return true;
         }
         // minął limit albo pojawiły się niepoprawne liczby - przywracamy stan z wejścia do solvera
@@ -61,7 +88,8 @@ public static class ConstraintSolver
     {
         var edges = scene.Polygons.SelectMany(polygon => polygon.Edges).ToDictionary(edge => edge.Id);
         // All zwraca true, jeśli każda relacja spełnia swoją tolerancję; dla pustej listy też true
-        return scene.Constraints.All(constraint => IsSatisfied(Evaluate(constraint, edges)));
+        return ValidateArcRules(scene, out _) && scene.Constraints.All(constraint => IsSatisfied(Evaluate(constraint, edges)))
+            && ContinuitiesSatisfied(scene) && ArcShapesSatisfied(scene);
     }
 
     // Równanie musi istnieć, błąd być skończony, a jego wartość bezwzględna mieścić się w tolerancji.
@@ -71,7 +99,7 @@ public static class ConstraintSolver
     private static Equation? Evaluate(GeometricConstraint constraint, IReadOnlyDictionary<Guid, Edge> edges)
     {
         // sprawdzamy, czy każda krawędź wymieniona w relacji nadal istnieje w scenie
-        if (constraint.EdgeIds.Any(id => !edges.ContainsKey(id)))
+        if (constraint.EdgeIds.Any(id => !edges.ContainsKey(id) || edges[id].Kind != EdgeKind.Line))
             return null;
         // wybieramy sposób obliczenia błędu według typu relacji; nie zmieniamy geometrii
         return constraint switch
@@ -95,7 +123,7 @@ public static class ConstraintSolver
         double ux = length > MinimumLength ? dx / length : 1;
         double uy = length > MinimumLength ? dy / length : 0;
         // słownik wierzchołek -> wpływ zmiany jego X i Y na błąd
-        var gradients = new Dictionary<Vertex, (double X, double Y)>();
+        var gradients = new Dictionary<ScenePoint, (double X, double Y)>();
         // ruch początku wzdłuż odcinka skraca go, a ruch końca w tym kierunku go wydłuża
         AddGradient(gradients, edge.Start, -ux, -uy);
         AddGradient(gradients, edge.End, ux, uy);
@@ -129,7 +157,7 @@ public static class ConstraintSolver
         else if (angle < -Math.PI / 2)
             angle += Math.PI;
 
-        var gradients = new Dictionary<Vertex, (double X, double Y)>();
+        var gradients = new Dictionary<ScenePoint, (double X, double Y)>();
         // wpisy mówią, jak mały ruch każdego końca w X/Y zmieni błąd kąta
         // to pochodne różnicy kątów; początek ma przeciwny znak niż koniec, bo wektor = koniec - początek.
         AddGradient(gradients, first.Start, -uy / firstSquared, ux / firstSquared);
@@ -141,8 +169,8 @@ public static class ConstraintSolver
     }
 
     // Wspólny wierzchołek może wystąpić w obu krawędziach: jego pochodne trzeba zsumować
-    private static void AddGradient(Dictionary<Vertex, (double X, double Y)> gradients,
-        Vertex vertex, double x, double y)
+    private static void AddGradient(Dictionary<ScenePoint, (double X, double Y)> gradients,
+        ScenePoint vertex, double x, double y)
     {
         // x i y to dodawane składowe gradientu
         // odczytujemy wcześniejszy wkład tego punktu w tej relacji; brak wpisu daje (0, 0)
@@ -152,7 +180,7 @@ public static class ConstraintSolver
     }
 
     // Rozdziela korektę między wolne punkty proporcjonalnie do wpływu na błąd relacji.
-    private static bool Correct(Equation equation, bool angular, IReadOnlySet<Vertex>? pinned)
+    private static bool Correct(Equation equation, bool angular, IReadOnlySet<ScenePoint>? pinned)
     {
         // jeśli relacja już pasuje, nie trzeba niczego przesuwać
         if (IsSatisfied(equation))
@@ -196,5 +224,5 @@ public static class ConstraintSolver
     // Tolerance: dopuszczalny błąd tego typu relacji
     // Gradients: dla każdego wierzchołka para pochodnych błędu po jego X i Y
     private sealed record Equation(double Error, double Tolerance,
-        Dictionary<Vertex, (double X, double Y)> Gradients);
+        Dictionary<ScenePoint, (double X, double Y)> Gradients);
 }

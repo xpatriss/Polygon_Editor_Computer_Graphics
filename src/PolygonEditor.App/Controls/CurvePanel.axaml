@@ -1,0 +1,20 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="PolygonEditor.App.Controls.CurvePanel">
+    <StackPanel Spacing="8">
+        <Separator />
+        <TextBlock Text="Krzywe i ciągłość" FontWeight="SemiBold" />
+        <TextBlock x:Name="CurveInfo" TextWrapping="Wrap" />
+        <Button x:Name="ToggleBezierButton" Content="Zamień na Béziera" />
+        <Button x:Name="ToggleArcButton" Content="Zamień na łuk" />
+        <Button x:Name="FlipArcButton" Content="Zmień stronę półokręgu" />
+        <ComboBox x:Name="ContinuityChoice" HorizontalAlignment="Stretch" />
+        <Button x:Name="SetContinuityButton" Content="Ustaw ciągłość wierzchołka" />
+        <TextBlock Text="Kwadraty to uchwyty Béziera — przeciągaj je lewym przyciskiem. Ciągłość wybierz po kliknięciu wierzchołka."
+                   TextWrapping="Wrap" />
+        <TextBlock Text="G0: wspólny punkt. G1: zgodny kierunek stycznych. C1: równe wektory styczne."
+                   TextWrapping="Wrap" />
+        <TextBlock Text="Łuk: G0/G0 daje półokrąg. G1 dozwolone na jednym końcu; C1 jest niedostępne."
+                   TextWrapping="Wrap" />
+    </StackPanel>
+</UserControl>

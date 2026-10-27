@@ -29,6 +29,12 @@ namespace PolygonEditor.Core.Model
         internal void AddConstraint(GeometricConstraint constraint) => constraints.Add(constraint);
         internal bool RemoveConstraint(GeometricConstraint constraint) => constraints.Remove(constraint);
 
+        internal void RestoreConstraints(IEnumerable<GeometricConstraint> saved)
+        {
+            constraints.Clear();
+            constraints.AddRange(saved);
+        }
+
         // Usunięcie krawędzi usuwa każdą relację, która się do niej odwoływała.
         internal void RemoveConstraintsForEdges(IEnumerable<Guid> edgeIds)
         {

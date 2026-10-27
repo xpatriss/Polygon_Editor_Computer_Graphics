@@ -13,5 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../PolygonEditor.Core/PolygonEditor.Core.csproj" />
+    <!-- Pomoc jest częścią programu, więc działa także po przeniesieniu aplikacji. -->
+    <EmbeddedResource Include="Help/*.md" />
   </ItemGroup>
 </Project>

@@ -308,5 +308,7 @@ Check("Self-intersection interior and topmost polygon are selectable", () =>
 });
 BresenhamChecks.Run(Check);
 ConstraintChecks.Run(Check);
+BezierChecks.Run(Check);
+ArcChecks.Run(Check);
 Console.WriteLine($"RESULT: {checks - failures}/{checks} checks passed.");
 return failures == 0 ? 0 : 1;

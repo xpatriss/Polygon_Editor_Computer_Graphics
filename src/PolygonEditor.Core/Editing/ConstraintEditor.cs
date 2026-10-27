@@ -11,9 +11,9 @@ public static class ConstraintEditor
     // Ustawienie długości zastępuje poprzednią długość tej samej krawędzi.
     public static bool TrySetLength(Scene scene, Edge edge, double length, out string message)
     {
-        if (scene.FindEdge(edge.Id) != edge || !double.IsFinite(length) || length <= 0)
+        if (scene.FindEdge(edge.Id) != edge || edge.Kind != EdgeKind.Line || !double.IsFinite(length) || length <= 0)
         {
-            message = "Długość musi być dodatnią, skończoną liczbą, a krawędź należeć do sceny.";
+            message = "Wybierz odcinek sceny i dodatnią, skończoną długość. Relacje długości dotyczą odcinków.";
             return false;
         }
         // szuykamy poprzedniego ograniczenia długości, jeśli nie było to null
@@ -24,7 +24,7 @@ public static class ConstraintEditor
         var candidate = scene.Constraints.Where(item => item != previous).Append(constraint).ToArray();
         // solver próbuje dostosować scenę do nowego zestawu ograniczeń
         // przy nadawaniu długości zachowujemy początek wybranej krawędzi
-        if (!ConstraintSolver.TrySolve(scene, new HashSet<Vertex> { edge.Start }, candidate))
+        if (!ConstraintSolver.TrySolve(scene, new HashSet<ScenePoint> { edge.Start }, candidate))
         {
             message = "Nie udało się uzgodnić długości z pozostałymi relacjami. Zmianę cofnięto.";
             return false;
@@ -41,9 +41,10 @@ public static class ConstraintEditor
     public static bool TryAddParallel(Scene scene, Edge first, Edge second, out string message)
     {
         if (first == second || scene.FindEdge(first.Id) != first || scene.FindEdge(second.Id) != second
+            || first.Kind != EdgeKind.Line || second.Kind != EdgeKind.Line
             || SceneGeometry.EdgeLength(first) < 1e-8 || SceneGeometry.EdgeLength(second) < 1e-8)
         {
-            message = "Wybierz dwie różne krawędzie o niezerowej długości.";
+            message = "Wybierz dwa różne odcinki o niezerowej długości. Równoległość dotyczy odcinków.";
             return false;
         }
         if (scene.Constraints.OfType<ParallelConstraint>().Any(item => item.EdgeIds.Contains(first.Id) && item.EdgeIds.Contains(second.Id)))
@@ -54,7 +55,7 @@ public static class ConstraintEditor
         var constraint = new ParallelConstraint(first.Id, second.Id);
         var candidate = scene.Constraints.Append(constraint).ToArray();
         // Pierwsza krawędź jest odniesieniem podczas dodawania, ale nie jest trwale przypięta.
-        if (!ConstraintSolver.TrySolve(scene, new HashSet<Vertex> { first.Start, first.End }, candidate))
+        if (!ConstraintSolver.TrySolve(scene, new HashSet<ScenePoint> { first.Start, first.End }, candidate))
         {
             message = "Nie udało się uzgodnić równoległości z pozostałymi relacjami. Zmianę cofnięto.";
             return false;

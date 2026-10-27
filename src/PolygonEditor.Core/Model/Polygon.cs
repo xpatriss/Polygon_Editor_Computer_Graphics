@@ -23,9 +23,30 @@ namespace PolygonEditor.Core.Model
             var start = edge.Start.Position;
             var end = edge.End.Position;
             var vertex = new Vertex(new Geometry.Point2D(start.X / 2 + end.X / 2, start.Y / 2 + end.Y / 2));
+            var left = new Edge(edge.Start, vertex);
+            var right = new Edge(vertex, edge.End);
+            if (edge.Bezier is { } curve)
+            {
+                // Dzielimy faktyczną krzywą, nie jej cięciwę.
+                var split = Geometry.BezierCurve.SplitHalf(start, curve.FirstControl.Position, curve.SecondControl.Position, end);
+                vertex.Position = split.Middle;
+                left.Bezier = new BezierSegment(split.LeftFirst, split.LeftSecond);
+                right.Bezier = new BezierSegment(split.RightFirst, split.RightSecond);
+                vertex.Continuity = ContinuityClass.G1;
+            }
+            else if (edge.Arc is { } arc)
+            {
+                vertex.Position = Geometry.CircularArcGeometry.PointAt(edge, 0.5);
+                left.Arc = new ArcSegment(arc.Center.Position) { Direction = arc.Direction };
+                right.Arc = new ArcSegment(arc.Center.Position) { Direction = arc.Direction };
+                // Przy G0/G0 nowe G1 w środku zachowuje okrąg i daje po jednym G1 na każdym dziecku.
+                // Jeśli oryginał miał już G1, nowe złącze ma G0, aby nie nadać dziecku dwóch G1.
+                vertex.Continuity = edge.Start.Continuity == ContinuityClass.G0 && edge.End.Continuity == ContinuityClass.G0
+                    ? ContinuityClass.G1 : ContinuityClass.G0;
+            }
             vertices.Insert(index + 1, vertex);
-            edges[index] = new Edge(edge.Start, vertex);
-            edges.Insert(index + 1, new Edge(vertex, edge.End));
+            edges[index] = left;
+            edges.Insert(index + 1, right);
             return vertex;
         }
 
@@ -41,10 +62,35 @@ namespace PolygonEditor.Core.Model
 
             int previous = (index + edges.Count - 1) % edges.Count;
             // Dla pierwszego wierzchołka poprzednią krawędzią jest ostatnia na liście.
-            edges[previous] = new Edge(edges[previous].Start, edges[index].End);
+            var incoming = edges[previous];
+            var outgoing = edges[index];
+            var merged = new Edge(incoming.Start, outgoing.End);
+            if (incoming.Kind != EdgeKind.Line || outgoing.Kind != EdgeKind.Line)
+            {
+                // Nowa krzywa zachowuje zewnętrzne styczne obu zastępowanych segmentów.
+                var firstTangent = Geometry.EndpointTangent.For(incoming, true).Vector;
+                var secondTangent = Geometry.EndpointTangent.For(outgoing, false).Vector;
+                var first = new Geometry.Point2D(incoming.Start.Position.X + firstTangent.X / 3,
+                    incoming.Start.Position.Y + firstTangent.Y / 3);
+                var second = new Geometry.Point2D(outgoing.End.Position.X - secondTangent.X / 3,
+                    outgoing.End.Position.Y - secondTangent.Y / 3);
+                merged.Bezier = new BezierSegment(first, second);
+            }
+            edges[previous] = merged;
             edges.RemoveAt(index);
             vertices.RemoveAt(index);
             return true;
+        }
+
+        // Kopia obwodu do cofnięcia nieudanej edycji. Zachowujemy oryginalne obiekty i Id.
+        internal (Vertex[] Vertices, Edge[] Edges) CaptureTopology() => (vertices.ToArray(), edges.ToArray());
+
+        internal void RestoreTopology(Vertex[] savedVertices, Edge[] savedEdges)
+        {
+            vertices.Clear();
+            vertices.AddRange(savedVertices);
+            edges.Clear();
+            edges.AddRange(savedEdges);
         }
 
         // Tworzy wielokąt z wierzchołków podanych w kolejności obwodu.

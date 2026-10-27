@@ -7,5 +7,7 @@
 .idea/
 *.user
 *.suo
+
 docs/
 example_app/
+checks/

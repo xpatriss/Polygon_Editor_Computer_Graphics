@@ -4,13 +4,13 @@ namespace PolygonEditor.Core.Geometry;
 
 // Wynik kliknięcia: wskazuje wielokąt oraz ewentualnie jego wierzchołek lub krawędź.
 // Vertex i Edge równe null wskazują cały wielokąt, np. po kliknięciu jego wnętrza.
-// Przechowuje istniejące obiekty sceny, bez kopiowania ich geometrii.
-public sealed record HitResult(Polygon Polygon, Vertex? Vertex = null, Edge? Edge = null);
+// ControlPoint wskazuje uchwyt, a Edge jego krawędź. Nie kopiujemy geometrii sceny.
+public sealed record HitResult(Polygon Polygon, Vertex? Vertex = null, Edge? Edge = null, ControlPoint? ControlPoint = null);
 
 // Sprawdza, który element sceny znajduje się pod kursorem lub blisko niego.
 public static class HitTesting
 {
-    // Szuka kolejno wierzchołka, krawędzi i wnętrza; później rysowane obiekty mają pierwszeństwo.
+    // Szuka kolejno wierzchołka, uchwytu, krawędzi i wnętrza; odpowiada to warstwom rysowania.
     // Zwraca: opis trafienia albo null, gdy kliknięto puste miejsce.
     public static HitResult? Pick(Scene scene, Point2D point, double tolerance = 8)
     {
@@ -29,8 +29,21 @@ public static class HitTesting
         for (int i = scene.Polygons.Count - 1; i >= 0; i--)
         {
             var polygon = scene.Polygons[i];
+            // Uchwyty są nad krzywymi, ale pod znacznikami wierzchołków.
             foreach (var edge in polygon.Edges.Reverse())
-                if (DistanceToSegmentSquared(point, edge.Start.Position, edge.End.Position) <= tolerance * tolerance)
+            {
+                if (edge.Bezier is not { } curve)
+                    continue;
+                foreach (var control in new[] { curve.SecondControl, curve.FirstControl })
+                    if (DistanceSquared(point, control.Position) <= tolerance * tolerance)
+                        return new HitResult(polygon, Edge: edge, ControlPoint: control);
+            }
+        }
+        for (int i = scene.Polygons.Count - 1; i >= 0; i--)
+        {
+            var polygon = scene.Polygons[i];
+            foreach (var edge in polygon.Edges.Reverse())
+                if (DistanceToEdgeSquared(point, edge) <= tolerance * tolerance)
                     return new HitResult(polygon, Edge: edge);
         }
         for (int i = scene.Polygons.Count - 1; i >= 0; i--)
@@ -42,6 +55,10 @@ public static class HitTesting
     // Zwraca kwadrat odległości dwóch punktów, do porównania z tolerancją nie potrzeba pierwiastka.
     public static double DistanceSquared(Point2D a, Point2D b)
         => (a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y);
+
+    // Trafiamy w rzeczywisty przebieg krzywej przybliżony tą samą polilinią co na ekranie.
+    public static double DistanceToEdgeSquared(Point2D point, Edge edge)
+        => SceneGeometry.EdgeSegments(edge).Min(segment => DistanceToSegmentSquared(point, segment.Start, segment.End));
 
     // Znajduje najbliższe miejsce na odcinku, uwzględniając także jego końce.
     // Zwraca: kwadrat odległości punktu od odcinka prostopadle do niego,
@@ -69,19 +86,20 @@ public static class HitTesting
         bool inside = false;
         foreach (var edge in polygon.Edges)
         {
-            var a = edge.Start.Position;
-            var b = edge.End.Position;
-            // Reguła parzystości: półprosta w prawo. Półotwarty przedział Y
-            // zapobiega dwukrotnemu liczeniu wspólnego wierzchołka, pomija odcinki poziome
-            if ((a.Y > point.Y) != (b.Y > point.Y))
+            foreach (var (a, b) in SceneGeometry.EdgeSegments(edge))
             {
-                // fraction - jaką część drogi od A do B trzeba przejść, żeby osiągnąć Y kursora
-                // crossingX - przechodzimy tę samą część drogi we współrzędnej X
-                double fraction = (point.Y - a.Y) / (b.Y - a.Y);
-                double crossingX = a.X + fraction * (b.X - a.X);
-                // jeśli przecięcie leży po prawej stronie kursora, liczymy je, odwracając stan
-                if (point.X < crossingX)
-                    inside = !inside;
+                // Reguła parzystości: półprosta w prawo. Półotwarty przedział Y
+                // zapobiega dwukrotnemu liczeniu wspólnego wierzchołka, pomija odcinki poziome
+                if ((a.Y > point.Y) != (b.Y > point.Y))
+                {
+                    // fraction - jaką część drogi od A do B trzeba przejść, żeby osiągnąć Y kursora
+                    // crossingX - przechodzimy tę samą część drogi we współrzędnej X
+                    double fraction = (point.Y - a.Y) / (b.Y - a.Y);
+                    double crossingX = a.X + fraction * (b.X - a.X);
+                    // jeśli przecięcie leży po prawej stronie kursora, liczymy je, odwracając stan
+                    if (point.X < crossingX)
+                        inside = !inside;
+                }
             }
         }
         return inside;

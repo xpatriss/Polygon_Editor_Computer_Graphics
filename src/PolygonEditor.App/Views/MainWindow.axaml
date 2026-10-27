@@ -13,10 +13,12 @@
           ColumnDefinitions="*,270"
           RowSpacing="12"
           ColumnSpacing="12">
-        <TextBlock Grid.ColumnSpan="2"
+        <TextBlock
                    Text="Edytor wielokątów"
                    FontSize="20"
                    FontWeight="SemiBold" />
+        <Button Grid.Column="1" x:Name="HelpButton" Content="Pomoc / dokumentacja (F1)"
+                HorizontalAlignment="Stretch" />
 
         <!-- główny obszar okna -->
         <Border Grid.Row="1"
@@ -44,6 +46,7 @@
                            TextWrapping="Wrap" />
                 <Button x:Name="InsertVertexButton" Content="Dodaj wierzchołek" />
                 <Button x:Name="DeleteVertexButton" Content="Usuń wierzchołek" />
+                <controls:CurvePanel x:Name="CurvesPanel" />
                 <controls:ConstraintPanel x:Name="ConstraintsPanel" />
                 <TextBlock Text="Lewy przycisk: zaznacz i przeciągnij. Wnętrze lub krawędź: ruch wielokąta."
                            TextWrapping="Wrap" />

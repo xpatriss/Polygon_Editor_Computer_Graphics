@@ -22,6 +22,10 @@ public sealed class SceneCanvas : Control
     public string SelectionDescription => interaction.Message;
     public Edge? SelectedEdge => interaction.Selection?.Edge;
     public Edge? SecondSelectedEdge => interaction.SecondaryEdge;
+    public Vertex? SelectedVertex => interaction.Selection?.Vertex;
+    public bool SelectedVertexHasArc => SelectedVertex is { } vertex && scene is not null
+        && scene.Polygons.SelectMany(polygon => polygon.Edges)
+            .Any(edge => edge.Arc is not null && (edge.Start == vertex || edge.End == vertex));
 
     public SceneCanvas()
     {
@@ -165,6 +169,30 @@ public sealed class SceneCanvas : Control
     {
         StopDragging();
         interaction.AddParallel();
+        Focus();
+        Refresh();
+    }
+
+    public void SetEdgeKind(EdgeKind kind)
+    {
+        StopDragging();
+        interaction.SetEdgeKind(kind);
+        Focus();
+        Refresh();
+    }
+
+    public void SetContinuity(ContinuityClass continuity)
+    {
+        StopDragging();
+        interaction.SetContinuity(continuity);
+        Focus();
+        Refresh();
+    }
+
+    public void FlipArc()
+    {
+        StopDragging();
+        interaction.FlipArc();
         Focus();
         Refresh();
     }

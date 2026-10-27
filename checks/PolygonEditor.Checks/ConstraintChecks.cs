@@ -74,14 +74,14 @@ internal static class ConstraintChecks
             var (scene, first, second) = ConstrainedPair();
             var before = SceneGeometry.CapturePositions(scene);
             var target = new Point2D(15, 35);
-            Require(SceneEditor.TryMove(scene, before, new Dictionary<Vertex, Point2D> { [first.Start] = target }), "Move failed.");
+            Require(SceneEditor.TryMove(scene, before, new Dictionary<ScenePoint, Point2D> { [first.Start] = target }), "Move failed.");
             Near(first.Start.Position.X, target.X);
             Near(first.Start.Position.Y, target.Y);
             Near(SceneGeometry.EdgeLength(first), 100);
             Near(SceneGeometry.EdgeLength(second), 100);
             Require(ConstraintSolver.AreSatisfied(scene), "Drag broke a constraint.");
             var after = SceneGeometry.CapturePositions(scene);
-            Require(SceneEditor.TryMove(scene, before, new Dictionary<Vertex, Point2D> { [first.Start] = target }), "Repeated move failed.");
+            Require(SceneEditor.TryMove(scene, before, new Dictionary<ScenePoint, Point2D> { [first.Start] = target }), "Repeated move failed.");
             SamePositions(after);
         });
 
@@ -94,7 +94,7 @@ internal static class ConstraintChecks
             for (int i = 0; i < 3; i++)
                 Require(ConstraintEditor.TryAddParallel(scene, polygons[i].Edges[0], polygons[(i + 1) % 3].Edges[0], out var message), message);
             var before = SceneGeometry.CapturePositions(scene);
-            Require(SceneEditor.TryMove(scene, before, new Dictionary<Vertex, Point2D> { [polygons[0].Vertices[0]] = new(10, 40) }), "Cyclic move failed.");
+            Require(SceneEditor.TryMove(scene, before, new Dictionary<ScenePoint, Point2D> { [polygons[0].Vertices[0]] = new(10, 40) }), "Cyclic move failed.");
             Require(ConstraintSolver.AreSatisfied(scene), "A cycle lost a relation.");
         });
 
@@ -102,9 +102,9 @@ internal static class ConstraintChecks
         {
             var (scene, first, _) = ConstrainedPair();
             var initial = SceneGeometry.CapturePositions(scene);
-            Require(SceneEditor.TryMove(scene, initial, new Dictionary<Vertex, Point2D> { [first.Start] = new(10, 20) }), "Valid setup move failed.");
+            Require(SceneEditor.TryMove(scene, initial, new Dictionary<ScenePoint, Point2D> { [first.Start] = new(10, 20) }), "Valid setup move failed.");
             var lastValid = SceneGeometry.CapturePositions(scene);
-            var impossible = new Dictionary<Vertex, Point2D> { [first.Start] = new(0, 0), [first.End] = new(300, 0) };
+            var impossible = new Dictionary<ScenePoint, Point2D> { [first.Start] = new(0, 0), [first.End] = new(300, 0) };
             Require(!SceneEditor.TryMove(scene, initial, impossible), "Impossible fixed endpoints were accepted.");
             SamePositions(lastValid);
             Require(ConstraintSolver.AreSatisfied(scene), "Failed movement damaged constraints.");
@@ -130,7 +130,7 @@ internal static class ConstraintChecks
             Require(ConstraintEditor.TryAddParallel(scene, polygon.Edges[0], polygon.Edges[1], out var message), message);
             Require(ConstraintSolver.AreSatisfied(scene), "Shared endpoint relation failed.");
             var initial = SceneGeometry.CapturePositions(scene);
-            Require(SceneEditor.TryMove(scene, initial, new Dictionary<Vertex, Point2D> { [polygon.Vertices[1]] = new(100, 20) }), "Shared-vertex movement failed.");
+            Require(SceneEditor.TryMove(scene, initial, new Dictionary<ScenePoint, Point2D> { [polygon.Vertices[1]] = new(100, 20) }), "Shared-vertex movement failed.");
             Require(ConstraintSolver.AreSatisfied(scene), "Shared-vertex gradient lost parallelism.");
         });
 
@@ -138,8 +138,8 @@ internal static class ConstraintChecks
         {
             var scene = DemoSceneFactory.Create();
             var polygon = scene.Polygons[0];
-            var kept = polygon.Edges[2];
-            Require(ConstraintEditor.TrySetLength(scene, kept, 180, out var message), message);
+            var kept = polygon.Edges[1];
+            Require(ConstraintEditor.TrySetLength(scene, kept, SceneGeometry.EdgeLength(kept), out var message), message);
             GeometryEditor.InsertMidpoint(scene, polygon, polygon.Edges[0]);
             Require(scene.Constraints.Count == 1 && scene.Constraints[0].EdgeIds.Contains(kept.Id), "Wrong constraints survived split.");
             Require(scene.FindEdge(kept.Id) == kept && ConstraintSolver.AreSatisfied(scene), "Unaffected edge was lost.");
@@ -199,7 +199,7 @@ internal static class ConstraintChecks
             {
                 double angle = i * Math.PI / 60;
                 var target = new Point2D(25 * Math.Cos(angle), 25 * Math.Sin(angle));
-                Require(SceneEditor.TryMove(scene, before, new Dictionary<Vertex, Point2D> { [polygon.Vertices[0]] = target }),
+                Require(SceneEditor.TryMove(scene, before, new Dictionary<ScenePoint, Point2D> { [polygon.Vertices[0]] = target }),
                     $"Rigid triangle failed at cursor target {i}.");
                 Near(polygon.Vertices[0].Position.X, target.X, 1e-10);
                 Near(polygon.Vertices[0].Position.Y, target.Y, 1e-10);
@@ -265,7 +265,7 @@ internal static class ConstraintChecks
         return (scene, first, second);
     }
 
-    private static void SamePositions(IReadOnlyDictionary<Vertex, Point2D> expected)
+    private static void SamePositions(IReadOnlyDictionary<ScenePoint, Point2D> expected)
     {
         foreach (var (vertex, point) in expected)
         {

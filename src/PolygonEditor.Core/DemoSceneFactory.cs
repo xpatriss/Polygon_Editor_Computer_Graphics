@@ -25,10 +25,20 @@ namespace PolygonEditor.Core
                 new Point2D(360, 280),
                 new Point2D(580, 100)));
 
+            // Osobny wielokąt pokazuje łuk, bez nakładania go na uchwyty Béziera.
+            polygons.Add(CreatePolygon(
+                new Point2D(100, 400),
+                new Point2D(260, 400),
+                new Point2D(260, 520),
+                new Point2D(100, 520)));
+
             Scene scene = new Scene(polygons);
             // Długość górnej krawędzi prostokąta i równoległość z poziomą krawędzią drugiego wielokąta.
             if (!ConstraintEditor.TrySetLength(scene, polygons[0].Edges[0], 180, out var message)
-                || !ConstraintEditor.TryAddParallel(scene, polygons[0].Edges[0], polygons[1].Edges[1], out message))
+                || !ConstraintEditor.TryAddParallel(scene, polygons[0].Edges[0], polygons[1].Edges[1], out message)
+                || !CurveEditor.TrySetEdgeKind(scene, polygons[0].Edges[2], EdgeKind.CubicBezier, out message)
+                || !CurveEditor.TrySetEdgeKind(scene, polygons[2].Edges[0], EdgeKind.CircularArc, out message)
+                || !CurveEditor.TrySetContinuity(scene, polygons[2].Vertices[0], ContinuityClass.G1, out message))
                 throw new InvalidOperationException(message);
             return scene;
         }

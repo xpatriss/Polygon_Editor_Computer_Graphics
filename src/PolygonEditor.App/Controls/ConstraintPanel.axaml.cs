@@ -25,10 +25,11 @@ public partial class ConstraintPanel : UserControl
         {
             var selected = canvas.SelectedEdge;
             edgeInfo.Text = selected is null ? "Nie wybrano krawędzi."
+                : selected.Kind != EdgeKind.Line ? "Wybrano krzywą. Długość i równoległość dotyczą odcinków."
                 : $"Długość wybranej: {SceneGeometry.EdgeLength(selected):0.##}. "
                     + (canvas.SecondSelectedEdge is null ? "Brak drugiej krawędzi." : "Wybrano też drugą krawędź.");
-            lengthButton.IsEnabled = selected is not null;
-            parallelButton.IsEnabled = selected is not null && canvas.SecondSelectedEdge is not null;
+            lengthButton.IsEnabled = selected?.Kind == EdgeKind.Line;
+            parallelButton.IsEnabled = selected?.Kind == EdgeKind.Line && canvas.SecondSelectedEdge?.Kind == EdgeKind.Line;
             var selectedId = (list.SelectedItem as ConstraintListItem)?.Constraint.Id;
             var items = scene.Constraints.Select((constraint, index) =>
                 new ConstraintListItem(constraint, ConstraintLabels.Description(scene, constraint, index))).ToArray();

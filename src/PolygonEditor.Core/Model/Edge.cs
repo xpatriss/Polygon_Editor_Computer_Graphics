@@ -7,6 +7,9 @@ namespace PolygonEditor.Core.Model
         public Guid Id { get; }
         public Vertex Start { get; }
         public Vertex End { get; }
+        public BezierSegment? Bezier { get; internal set; }
+        public ArcSegment? Arc { get; internal set; }
+        public EdgeKind Kind => Arc is not null ? EdgeKind.CircularArc : Bezier is not null ? EdgeKind.CubicBezier : EdgeKind.Line;
 
         public Edge(Vertex start, Vertex end)
         {

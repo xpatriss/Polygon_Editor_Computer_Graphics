@@ -15,6 +15,7 @@ namespace PolygonEditor.App.Rendering
         private readonly Pen selectedPolygonPen = new Pen(Brushes.DarkOrange, 2);
         private readonly Pen selectedEdgePen = new Pen(Brushes.Crimson, 3);
         private readonly Pen secondaryEdgePen = new Pen(Brushes.Teal, 3);
+        private readonly Pen controlPolygonPen = new Pen(Brushes.Gray, 1, DashStyle.Dash);
 
         // przekształca punkt w punkt Avalonii o tych samych współrzędnych
         private static Point ToAvaloniaPoint(Point2D position)
@@ -38,17 +39,39 @@ namespace PolygonEditor.App.Rendering
                     var pen = ReferenceEquals(edge, selection?.Edge) ? selectedEdgePen
                         : ReferenceEquals(edge, secondaryEdge) ? secondaryEdgePen
                         : ReferenceEquals(polygon, selection?.Polygon) ? selectedPolygonPen : edgePen;
-                    DrawLine(context, pen, edge.Start.Position, edge.End.Position, algorithm);
+                    if (edge.Bezier is { } curve)
+                    {
+                        // Wielobok kontrolny jest pomocniczy: nie stanowi krawędzi obwodu.
+                        context.DrawLine(controlPolygonPen, ToAvaloniaPoint(edge.Start.Position), ToAvaloniaPoint(curve.FirstControl.Position));
+                        context.DrawLine(controlPolygonPen, ToAvaloniaPoint(curve.FirstControl.Position), ToAvaloniaPoint(curve.SecondControl.Position));
+                        context.DrawLine(controlPolygonPen, ToAvaloniaPoint(curve.SecondControl.Position), ToAvaloniaPoint(edge.End.Position));
+                    }
+                    foreach (var (start, end) in SceneGeometry.EdgeSegments(edge))
+                        DrawLine(context, pen, start, end, algorithm);
                 }
             }
 
             DrawConstraintLabels(context, scene);
+            // Kwadratowe uchwyty rysujemy pod znacznikami wierzchołków, zgodnie z kolejnością trafiania.
+            foreach (var edge in scene.Polygons.SelectMany(polygon => polygon.Edges))
+                if (edge.Bezier is { } curve)
+                    foreach (var control in new[] { curve.FirstControl, curve.SecondControl })
+                    {
+                        var brush = ReferenceEquals(control, selection?.ControlPoint) ? Brushes.Crimson : Brushes.DarkViolet;
+                        context.DrawRectangle(brush, null, new Rect(control.Position.X - 4, control.Position.Y - 4, 8, 8));
+                    }
             foreach (var polygon in scene.Polygons)
             {
                 foreach (var vertex in polygon.Vertices)
                 {
                     var brush = ReferenceEquals(vertex, selection?.Vertex) ? Brushes.Crimson : Brushes.DodgerBlue;
                     context.DrawEllipse(brush, null, ToAvaloniaPoint(vertex.Position), VertexRadius, VertexRadius);
+                    if (polygon.Edges.Any(edge => (edge.Start == vertex || edge.End == vertex) && edge.Kind != EdgeKind.Line))
+                    {
+                        var label = new FormattedText(vertex.Continuity.ToString(), CultureInfo.CurrentCulture,
+                            FlowDirection.LeftToRight, Typeface.Default, 11, Brushes.DarkSlateGray);
+                        context.DrawText(label, new Point(vertex.Position.X + 7, vertex.Position.Y - 17));
+                    }
                 }
             }
         }

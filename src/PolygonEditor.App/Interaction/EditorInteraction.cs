@@ -18,7 +18,7 @@ public sealed class EditorInteraction
     private Point2D dragStart;
     private const double DragThreshold = 3;
     private bool dragThresholdReached;
-    private Dictionary<Vertex, Point2D> initialPositions = new();
+    private Dictionary<ScenePoint, Point2D> initialPositions = new();
     private Scene? scene;
 
     // Podłącza model i usuwa stan zaznaczenia z poprzedniej sceny.
@@ -45,7 +45,8 @@ public sealed class EditorInteraction
         // Kopia całej sceny zapobiega dryfowi także w wielokątach połączonych relacjami.
         initialPositions = SceneGeometry.CapturePositions(scene);
         IsDragging = true;
-        Message = Selection.Vertex is not null ? "Wybrano wierzchołek. Delete — usuń."
+        Message = Selection.ControlPoint is not null ? "Wybrano uchwyt Béziera. Przeciągnij, aby zmienić krzywą."
+            : Selection.Vertex is not null ? "Wybrano wierzchołek. Delete — usuń."
             : Selection.Edge is not null ? "Wybrano krawędź. Insert — dodaj wierzchołek w środku."
             : "Wybrano wielokąt. Przeciągnij, aby go przesunąć.";
     }
@@ -67,6 +68,12 @@ public sealed class EditorInteraction
             return;
         }
         SecondaryEdge = second;
+        if (first.Kind != EdgeKind.Line || second.Kind != EdgeKind.Line)
+        {
+            SecondaryEdge = null;
+            Message = "Do równoległości wybierz dwa odcinki; krzywe łączymy warunkami ciągłości.";
+            return;
+        }
         Message = "Wybrano dwie krawędzie. Możesz dodać równoległość.";
     }
 
@@ -84,8 +91,12 @@ public sealed class EditorInteraction
                 return;
             dragThresholdReached = true;
         }
-        var requested = new Dictionary<Vertex, Point2D>();
-        if (Selection.Vertex is not null)
+        var requested = new Dictionary<ScenePoint, Point2D>();
+        if (Selection.ControlPoint is not null)
+        {
+            requested[Selection.ControlPoint] = point;
+        }
+        else if (Selection.Vertex is not null)
         {
             // Aktywny wierzchołek znajduje się dokładnie pod kursorem.
             requested[Selection.Vertex] = point;
@@ -99,6 +110,19 @@ public sealed class EditorInteraction
             {
                 var original = initialPositions[vertex];
                 requested[vertex] = new Point2D(original.X + dx, original.Y + dy);
+            }
+            // Przy przesuwaniu całego wielokąta jego uchwyty przesuwają się razem z obwodem.
+            foreach (var curve in Selection.Polygon.Edges.Where(edge => edge.Bezier is not null).Select(edge => edge.Bezier!))
+                foreach (var control in new[] { curve.FirstControl, curve.SecondControl })
+                {
+                    var original = initialPositions[control];
+                    requested[control] = new Point2D(original.X + dx, original.Y + dy);
+                }
+            foreach (var edge in Selection.Polygon.Edges.Where(edge => edge.Arc is not null))
+            {
+                var center = edge.Arc!.Center;
+                var original = initialPositions[center];
+                requested[center] = new Point2D(original.X + dx, original.Y + dy);
             }
         }
         if (!SceneEditor.TryMove(scene, initialPositions, requested))
@@ -117,10 +141,19 @@ public sealed class EditorInteraction
             Message = "Najpierw zaznacz krawędź.";
             return false;
         }
-        var vertex = GeometryEditor.InsertMidpoint(scene, Selection.Polygon, edge);
+        Vertex vertex;
+        try
+        {
+            vertex = GeometryEditor.InsertMidpoint(scene, Selection.Polygon, edge);
+        }
+        catch (InvalidOperationException error)
+        {
+            Message = error.Message;
+            return false;
+        }
         SecondaryEdge = null;
         Selection = new HitResult(Selection.Polygon, Vertex: vertex);
-        Message = "Dodano wierzchołek w środku krawędzi.";
+        Message = "Dodano wierzchołek w środku odcinka lub w t=0.5 krzywej.";
         return true;
     }
 
@@ -136,7 +169,8 @@ public sealed class EditorInteraction
         }
         if (!GeometryEditor.RemoveVertex(scene, Selection.Polygon, vertex))
         {
-            Message = "Wielokąt musi mieć co najmniej trzy wierzchołki.";
+            Message = Selection.Polygon.Vertices.Count == 3 ? "Wielokąt musi mieć co najmniej trzy wierzchołki."
+                : "Nie udało się zachować ciągłości po usunięciu. Zmianę cofnięto.";
             return false;
         }
         Selection = new HitResult(Selection.Polygon);
@@ -155,6 +189,51 @@ public sealed class EditorInteraction
             return false;
         }
         bool result = ConstraintEditor.TrySetLength(scene, edge, length, out var message);
+        Message = message;
+        return result;
+    }
+
+    public bool SetEdgeKind(EdgeKind kind)
+    {
+        EndDrag();
+        if (scene is null || Selection?.Edge is not { } edge)
+        {
+            Message = "Najpierw wybierz krawędź.";
+            return false;
+        }
+        bool result = CurveEditor.TrySetEdgeKind(scene, edge, kind, out var message);
+        Message = message;
+        // Zmiana typu może usunąć uchwyt; po niej zaznaczenie wskazuje samą krawędź.
+        if (result)
+        {
+            Selection = new HitResult(Selection.Polygon, Edge: edge);
+            SecondaryEdge = null;
+        }
+        return result;
+    }
+
+    public bool SetContinuity(ContinuityClass continuity)
+    {
+        EndDrag();
+        if (scene is null || Selection?.Vertex is not { } vertex)
+        {
+            Message = "Najpierw wybierz wierzchołek.";
+            return false;
+        }
+        bool result = CurveEditor.TrySetContinuity(scene, vertex, continuity, out var message);
+        Message = message;
+        return result;
+    }
+
+    public bool FlipArc()
+    {
+        EndDrag();
+        if (scene is null || Selection?.Edge is not { } edge)
+        {
+            Message = "Najpierw wybierz łuk.";
+            return false;
+        }
+        bool result = CurveEditor.TryFlipArc(scene, edge, out var message);
         Message = message;
         return result;
     }
